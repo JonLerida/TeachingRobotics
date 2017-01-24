@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 import cv2
 import numpy as np
+import math
 
 from sensors.cameraFilter import CameraFilter
 from parallelIce.navDataClient import NavDataClient
@@ -32,7 +33,7 @@ class MyAlgorithm(threading.Thread):
         self.stop_event.clear()
 
         while (not self.kill_event.is_set()):
-           
+
             start_time = datetime.now()
 
             if not self.stop_event.is_set():
@@ -57,6 +58,13 @@ class MyAlgorithm(threading.Thread):
 
     def kill (self):
         self.kill_event.set()
+    #Parámetros del filtro
+    hmax = 2.59 *180 / (2* math.pi)
+    hmin = 1.89*180/(2*math.pi)
+    vmin = 170
+    vmax = 255
+    smin = 1.0*255
+    smax = 0.66*255
 
 
     def execute(self):

@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 import cv2
 import numpy as np
+import math
 
 from sensors.cameraFilter import CameraFilter
 from parallelIce.navDataClient import NavDataClient
@@ -33,7 +34,7 @@ class MyAlgorithm(threading.Thread):
         self.stop_event.clear()
 
         while (not self.kill_event.is_set()):
-           
+
             start_time = datetime.now()
 
             if not self.stop_event.is_set():
@@ -63,8 +64,8 @@ class MyAlgorithm(threading.Thread):
         Pi = 3.141592653589793
 
         # Valores de colorturner para filtrar la pelota roja
-        hmin_rojo = 5.92 *180 / (2* Pi)
-        hmax_rojo = 6.28 *180 / (2* Pi)
+        hmin_rojo = 5.92 *180 / (2* math.pi)
+        hmax_rojo = 6.28 *180 / (2* math.pi)
         vmin_rojo = 112.00
         vmax_rojo = 238.00
         smin_rojo = 0.85 * 255
@@ -73,8 +74,8 @@ class MyAlgorithm(threading.Thread):
         filtro_min_rojo = np.array([hmin_rojo, smin_rojo, vmin_rojo])
         filtro_max_rojo = np.array([hmax_rojo, smax_rojo, vmax_rojo])
         # Valores para filtrar la pelota azul
-        hmin_azul = 3.79 * 180 / (2 * Pi)
-        hmax_azul = 4.19 * 180 / (2 * Pi)
+        hmin_azul = 3.79 * 180 / (2 * math.pi)
+        hmax_azul = 4.19 * 180 / (2 * math.pi)
         vmin_azul = 69.00
         vmax_azul = 169.00
         smin_azul = 0.54 * 255
@@ -94,15 +95,7 @@ class MyAlgorithm(threading.Thread):
             bw_filtrada_rojo = cv2.inRange(imagen_hsv, filtro_min_rojo, filtro_max_rojo)
             bw_filtrada_azul = cv2.inRange(imagen_hsv, filtro_min_azul, filtro_max_azul)
             bw_suma= cv2.add(bw_filtrada_rojo, bw_filtrada_azul)  # 250+10 = 260 => 255
-
-            #mejoro la imagen usando operadores morfologicos
-            #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
-            #el resultado usando apertura no es bueno.
-            #el cierre queda descartado. erosion y dilatacion(?)
-
             #copio la imagen binaria en una auxiliar para usarla
-
-
 
             copia_roja = np.copy(bw_filtrada_rojo)
             copia_azul = np.copy(bw_filtrada_azul)
@@ -129,4 +122,3 @@ class MyAlgorithm(threading.Thread):
             bw_filtrada_suma = cv2.add(bw_filtrada_rojo,bw_filtrada_azul)
             self.camera.setColorImage(rectangle_image)
             self.camera.setThresoldImage(bw_filtrada_suma)
-

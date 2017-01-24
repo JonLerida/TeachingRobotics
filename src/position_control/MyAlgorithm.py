@@ -91,21 +91,25 @@ class MyAlgorithm(threading.Thread):
 
     def kill(self):
         self.kill_event.set()
-
+    #Creamos las clases para cada controlador
     PID_x = PID(5, 13, 0.2)
     PID_y = PID(5, 13, 0.2)
+    #Variables para control del dron
     error_x = [0, 0]
     error_y = [0, 0]
     vel_x = 0
     vel_y = 0
+    #Coordenadas del dron
     dronx = 0
     drony = 0
+    # Coordenadas de la baliza 
     beaconx = 0
     beacony = 0
 
     def execute(self):
         beacon = self.getNextBeacon()
         if (beacon == None):
+            #None--> dron se encuentra en 'inicio'
             print("Todas las balizas alcanzadas")
             self.cmdvel.sendCMDVel(0, 0, 0, 0, 0, 0)
             sys.exit()

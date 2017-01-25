@@ -59,21 +59,96 @@ class MyAlgorithm(threading.Thread):
     def kill (self):
         self.kill_event.set()
     #Parámetros del filtro
-    hmax = 2.59 *180 / (2* math.pi)
-    hmin = 1.89*180/(2*math.pi)
-    vmin = 170
+    hmax = 2.82 *180 / (2* math.pi)
+    hmin = 1.30*180/(2*math.pi)
+    vmin = 131
     vmax = 255
-    smin = 1.0*255
-    smax = 0.66*255
+    smin = 0.51*255
+    smax = 1.0*255
+    filtro_min = np.array([hmin, smin, vmin])
+    filtro_max = np.array([hmax, smax, vmax])
+    # control posicion
+    error_hor = [0, 0] #Error en la imagen captada por el dron
+    error_vert = [0, 0] # Error en la imagen captada por el dron
+
+
+    kobuki_pose = [0, 0]
+    vel_x = 0
+    vel_y = 0
+
+    class PID():
+        def __init__(self, kp, kd, ki):
+            self.kp = kp
+            self.kd = kd
+            self.ki = ki
+
+        def Vel(self, error):
+            return - self.kp * error[0] - self.kd * (error[0]-error[1]) - self.ki * (error[1]+error[0])
+    PID_x = PID(0.009, 0.017, 0.0005) #con 0.000075 va bien
+    PID_y = PID(0.009, 0.017, 0.0005)
 
 
     def execute(self):
-       # Add your code here
+        # Alto y ancho de la imagen captada por el dron (para calcular el centro)
+        camera_height = self.camera.height
+        camera_width = self.camera.width
+        center = [camera_width/2, camera_height/2]
 
+        #######################################
+        #primera parte, procesado de la imagen#
+        #######################################
         input_image = self.camera.getImage()
         if input_image is not None:
-            self.camera.setColorImage(input_image)
-            '''
-            If you want show a thresold image (black and white image)
-            self.camera.setThresoldImage(bk_image)
-            '''
+
+            #aplico filtro suavizado a la imagen
+            imagen_suavizada = cv2.GaussianBlur(input_image, (5, 5), 0)
+            #paso la imagen de RGB a HSV
+            imagen_hsv = cv2.cvtColor(imagen_suavizada, cv2.COLOR_RGB2HSV)
+            #filtro la imagen y obtengo una imagen binaria
+            bw_filtrada = cv2.inRange(imagen_hsv, self.filtro_min, self.filtro_max)
+            self.camera.setThresoldImage(bw_filtrada)
+
+            #copio la imagen binaria en una auxiliar para usarla
+            im_copia= np.copy(bw_filtrada)
+            #imagen copia para dibujar el rectángulo
+            rectangle_image = np.copy(input_image)
+            #obtengo los bordes del objeto segmentado
+            _,bordes,_ = cv2.findContours(im_copia, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            #actualizo en cada pasada la posicion del kobuki
+            self.kobuki_pose = [0, 0]
+            for cnt in bordes:
+                # w = ancho
+                # h = alto
+                x, y, w, h = cv2.boundingRect(cnt)
+                #defino la posicion del kubuki como el centro del rectangulo
+                if w > 1 and h >1:
+                    self.kobuki_pose = [x+w/2, y+h/2]
+                    rectangle_image = cv2.rectangle(rectangle_image, (x, y), (x + w, y + h), (255, 0, 0), 1)
+            self.camera.setColorImage(rectangle_image)
+        #########################################
+        #segunda parte, controlador de velocidad#
+        #########################################
+
+        if self.kobuki_pose != [0, 0]:
+            #error entre el kobuki y el centro de la imagen del dron
+            self.error_hor[0] = center[0]-self.kobuki_pose[0]
+            self.error_vert[0] = center[1]-self.kobuki_pose[1]
+            self.error_total = math.sqrt(math.fabs(self.error_hor[0]) + math.fabs(self.error_vert[0]))
+            if self.error_total > 5:
+                #calculo la velocidad necesaria
+                self.vel_x = self.PID_x.Vel(self.error_vert)
+                self.vel_y = self.PID_y.Vel(self.error_hor)
+                print("velocidad X: ", self.vel_x, " |Velocidad Y:  ", self.vel_y)
+                self.cmdvel.sendCMDVel(-self.vel_x, -self.vel_y, 0, 0, 0, 0)
+            else:
+                #si el error es menor de un umbral, no cambio la velocidad
+                print("Error mínimo. Mantengo posición...")
+                self.cmdvel.sendCMDVel(0, 0, 0, 0, 0, 0)
+
+            #cambio el "tiempo" del error
+            self.error_hor[1] = self.error_hor[0]
+            self.error_vert[1] = self.error_vert[0]
+        else:
+            #Si kobuki_pose = [0 0] significa que no he encontrado la tortuga
+            print("Kobuki no localizado. Mantengo posición...")
+            self.cmdvel.sendCMDVel(0,0, 0, 0, 0, 0)

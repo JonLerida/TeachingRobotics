@@ -88,7 +88,6 @@ class MyAlgorithm(threading.Thread):
         if image_input is not None:
             #aplico filtro suavizado a la imagen
             imagen_suavizada = cv2.GaussianBlur(image_input, (5, 5), 0)
-            #self.camera.setColorImage(imagen_suavizada)
             #paso la imagen de RGB a HSV
             imagen_hsv = cv2.cvtColor(imagen_suavizada, cv2.COLOR_RGB2HSV)
             #filtro la imagen y obtengo una imagen binaria
